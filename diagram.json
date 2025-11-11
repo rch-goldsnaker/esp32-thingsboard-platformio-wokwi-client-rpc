@@ -2,15 +2,7 @@
   "version": 1,
   "author": "Mirutec - Roger Chung",
   "editor": "wokwi",
-  "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
-    { "type": "wokwi-led", "id": "led1", "top": -61.2, "left": 23, "attrs": { "color": "red" } }
-  ],
-  "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "esp:2", "led1:A", "green", [ "h38.4", "v-182.4" ] ],
-    [ "led1:C", "esp:GND.1", "black", [ "h-76.4", "v172.8" ] ]
-  ],
+  "parts": [ { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} } ],
+  "connections": [ [ "esp:TX", "$serialMonitor:RX", "", [] ], [ "esp:RX", "$serialMonitor:TX", "", [] ] ],
   "dependencies": {}
 }

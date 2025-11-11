@@ -1,14 +1,15 @@
-# ESP32 ThingsBoard Shared Attributes
+# ESP32 ThingsBoard Client-Side RPC
 
-This project demonstrates **Shared Attributes** functionality with ESP32 and **ThingsBoard** IoT platform. The ESP32 controls an LED remotely using ThingsBoard shared attributes, allowing real-time control from the dashboard, simulated in **Wokwi**.
+This project demonstrates **Client-Side RPC** (Remote Procedure Call) functionality with ESP32 and **ThingsBoard** IoT platform. The ESP32 makes periodic RPC calls to the server to get the current time, showcasing bidirectional communication, simulated in **Wokwi**.
 
 ## 🎯 Features
 
-- **Remote LED Control**: Control LED from ThingsBoard dashboard
-- **Real-time Updates**: Instant LED response to shared attribute changes
-- **Bidirectional Sync**: LED state synchronized between device and server
-- **Simple Design**: Minimal code, maximum IoT functionality
-- **Wokwi Simulation**: Complete hardware simulation with LED
+- **Client-Side RPC**: Device initiates RPC calls to ThingsBoard server
+- **Real-time Communication**: Periodic requests every 10 seconds
+- **Server Response Handling**: Processes and displays server responses
+- **Timeout Management**: Handles cases where server doesn't respond
+- **Simple Design**: Clean code focused on RPC functionality
+- **Wokwi Simulation**: Complete ESP32 simulation environment
 
 ## 📚 Dependencies and Libraries
 
@@ -24,8 +25,8 @@ lib_deps =
 ### System Libraries
 - `WiFi.h` - WiFi connectivity (ESP32)
 - `Arduino_MQTT_Client.h` - MQTT client for ThingsBoard
-- `Attribute_Request.h` - Attribute request management
-- `Shared_Attribute_Update.h` - Shared attributes real-time updates
+- `Client_Side_RPC.h` - Client-side RPC functionality
+- `RPC_Request_Callback.h` - RPC callback management
 
 ## ⚙️ Configuration
 
@@ -40,12 +41,13 @@ constexpr char WIFI_PASSWORD[] = "";             // Password (empty for Wokwi)
 constexpr char TOKEN[] = "xxxxxxxxxxxxxxxxxxxx";           // Device token (from ThingsBoard)
 constexpr char THINGSBOARD_SERVER[] = "thingsboard.cloud"; // ThingsBoard server
 constexpr uint16_t THINGSBOARD_PORT = 1883U;               // MQTT port
-constexpr const char LED_STATE_ATTR[] = "ledState";        // Shared attribute name
+const unsigned long RPC_INTERVAL = 10000;                  // RPC call interval (10 seconds)
 ```
 
-### 3. Hardware Configuration
+### 3. RPC Configuration
 ```cpp
-#define LED_PIN 2        // LED connected to GPIO 2
+const unsigned long RPC_INTERVAL = 10000;      // RPC call interval in milliseconds
+const uint64_t RPC_TIMEOUT = 10000U * 1000U;   // RPC timeout in microseconds (10 seconds)
 ```
 
 ## 🚀 Installation and Usage
@@ -59,55 +61,74 @@ constexpr const char LED_STATE_ATTR[] = "ledState";        // Shared attribute n
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd esp32-thingsboard-platformio-wokwi-telemetry
+cd esp32-thingsboard-platformio-wokwi-client-rpc
 ```
 
 ### 3. ThingsBoard Configuration
 1. Create a new device in ThingsBoard
 2. Copy the device **Access Token**
 3. Replace the `TOKEN` in `main.cpp`
-4. Create a shared attribute `ledState` (boolean) in the device dashboard
+4. Create a **Rule Chain** to handle `getCurrentTime` RPC method
 
-### 4. Wokwi Simulation
+### 4. Server-Side RPC Handler (ThingsBoard Rule Chain)
+Add this JavaScript code in a **Script Node** in your Rule Chain:
+```javascript
+var rpcResponse;
+if (msg.method === "getCurrentTime"){
+   rpcResponse = new Date().getTime();
+} else {
+   rpcResponse = "Unknown RPC request method: " + msg.method;  
+}
+return {msg: rpcResponse, metadata: metadata, msgType: msgType};
+```
+
+### 5. Wokwi Simulation
 1. Open the project in Wokwi
 2. The `diagram.json` contains:
    - ESP32 DevKit C V4
-   - Red LED on GPIO 2
 3. Run the simulation
-4. Monitor serial port for connection status
-5. Control LED from ThingsBoard dashboard
+4. Monitor serial port for RPC calls and responses
 
 ## 🔧 How It Works
 
-### Shared Attributes Flow
+### Client-Side RPC Flow
 1. **Connection**: ESP32 connects to WiFi and ThingsBoard
-2. **Subscribe**: Automatically subscribes to `ledState` shared attribute updates
-3. **Request**: Requests current `ledState` value from server
-4. **Real-time Control**: LED responds instantly to dashboard changes
-5. **Bidirectional Sync**: Device and server stay synchronized
+2. **Periodic Calls**: Every 10 seconds, device calls `getCurrentTime` RPC method
+3. **Server Processing**: ThingsBoard Rule Chain processes the request and returns current timestamp
+4. **Response Handling**: Device receives and displays the server response
+5. **Timeout Management**: Handles cases where server doesn't respond within 10 seconds
 
 ### Hardware Components
-- **LED (GPIO 2)**: Visual indicator controlled remotely
-- **Serial Monitor**: Status messages and debugging
+- **ESP32**: Main microcontroller running the RPC client
+- **Serial Monitor**: RPC calls, responses and debugging information
 
 ## 📊 ThingsBoard Integration
 
-### Shared Attributes
-- **ledState** (boolean): Controls LED state remotely from dashboard
+### Client-Side RPC Method
+- **getCurrentTime**: Returns current server timestamp in milliseconds
 
 ### Device Behavior
-- **First Connection**: Requests current shared attribute value
-- **Real-time Updates**: LED changes instantly when attribute is modified
-- **Dashboard Control**: Toggle LED from ThingsBoard web interface
-- **State Synchronization**: Device and server maintain consistent state
+- **Automatic Calls**: Makes RPC calls every 10 seconds automatically
+- **Response Processing**: Displays server timestamp in serial monitor
+- **Error Handling**: Shows timeout messages if server doesn't respond
+- **Continuous Operation**: Maintains connection and continues making calls
 
 ## 🎮 Usage
 
-1. **Power On**: Device connects and requests current LED state
-2. **Dashboard Control**: Go to ThingsBoard → Device → Attributes tab
-3. **Toggle LED**: Modify `ledState` shared attribute (true/false)
-4. **Real-time Response**: LED changes instantly on the device
-5. **Restart Device**: LED automatically syncs with server state
+1. **Power On**: Device connects to WiFi and ThingsBoard
+2. **Automatic RPC**: Device starts making `getCurrentTime` calls every 10 seconds
+3. **Monitor Serial**: Watch RPC calls and server responses in serial monitor
+4. **Server Response**: See current timestamp from ThingsBoard server
+5. **Continuous Operation**: Device maintains connection and continues RPC calls
+
+### Expected Serial Output
+```
+Making client-side RPC call: getCurrentTime
+RPC call sent successfully
+=== CLIENT-SIDE RPC RESPONSE RECEIVED ===
+Server current time: 1731337845000
+=========================================
+```
 
 ## �📄 License
 
@@ -125,16 +146,17 @@ For questions or issues:
 
 ### Common Issues
 - **"Failed to connect to ThingsBoard"**: Check device token and internet connection
-- **"LED value not found in shared attributes"**: Create `ledState` shared attribute in dashboard
-- **"Failed to subscribe for shared attribute updates"**: Check MQTT connection
-- **"Timeout: No response from ThingsBoard"**: Network or server issues
+- **"RPC timeout - no response from server"**: Rule Chain not configured or server issues
+- **"Failed to send RPC call"**: Check MQTT connection and ThingsBoard status
+- **"RPC call already in progress"**: Previous call hasn't completed (normal behavior)
 
 ### Serial Monitor Messages
-- `LED state updated from shared attributes: ON/OFF` - Remote control successful
-- `Subscribed to shared attributes` - Ready to receive updates
+- `Making client-side RPC call: getCurrentTime` - RPC call initiated
+- `RPC call sent successfully` - Request sent to server
+- `Server current time: [timestamp]` - Successful response received
 - `Connected to ThingsBoard successfully!` - Device online and ready
 
 ---
 **Author**: Mirutec - Roger Chung  
-**Version**: 1.0 - Shared Attributes  
+**Version**: 1.0 - Client-Side RPC  
 **Date**: November 2025

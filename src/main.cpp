@@ -1,8 +1,8 @@
 #include <WiFi.h>
 #include <Arduino_MQTT_Client.h>
 #include <ThingsBoard.h>
-#include <Attribute_Request.h>
-#include <Shared_Attribute_Update.h>
+#include <Client_Side_RPC.h>
+#include <RPC_Request_Callback.h>
 
 constexpr char WIFI_SSID[] = "Wokwi-GUEST";
 constexpr char WIFI_PASSWORD[] = "";
@@ -12,54 +12,69 @@ constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
 #define LED_PIN 2
 
-constexpr const char LED_STATE_ATTR[] = "ledState";
-constexpr size_t MAX_ATTRIBUTES = 3U;
-constexpr uint64_t REQUEST_TIMEOUT_MICROSECONDS = 5000U * 1000U;
-
 WiFiClient wifiClient;
 Arduino_MQTT_Client mqttClient(wifiClient);
-Attribute_Request<1U, MAX_ATTRIBUTES> attr_request;
-Shared_Attribute_Update<1U, MAX_ATTRIBUTES> shared_update;
+Client_Side_RPC<5U> client_rpc;
 
-const std::array<IAPI_Implementation *, 2U> apis = {
-    &attr_request,
-    &shared_update
+const std::array<IAPI_Implementation *, 1U> apis = {
+    &client_rpc
 };
 
 ThingsBoard tb(mqttClient, 1024U, Default_Max_Stack_Size, apis);
 
-bool ledState = false;
+// Variables for Client-side RPC
+unsigned long lastRpcCall = 0;
+const unsigned long RPC_INTERVAL = 10000; // Call RPC every 10 seconds
+bool rpcInProgress = false;
 
-constexpr std::array<const char *, 1U> SHARED_ATTRIBUTES_LIST = {LED_STATE_ATTR};
-
-void processSharedAttributes(const JsonObjectConst &data)
-{
-  bool attributeFound = false;
-  for (auto it = data.begin(); it != data.end(); ++it)
-  {
-    if (strcmp(it->key().c_str(), LED_STATE_ATTR) == 0)
-    {
-      ledState = it->value().as<bool>();
-      digitalWrite(LED_PIN, ledState);
-      Serial.print("LED state updated from shared attributes: ");
-      Serial.println(ledState ? "ON" : "OFF");
-      attributeFound = true;
-    }
+// Callback function to handle RPC response
+void rpcResponseCallback(const JsonDocument &data) {
+  Serial.println("=== CLIENT-SIDE RPC RESPONSE RECEIVED ===");
+  
+  if (data.is<long long>()) {
+    long long serverTime = data.as<long long>();
+    Serial.print("Server current time: ");
+    Serial.println(serverTime);
+  } else if (data.is<const char*>()) {
+    Serial.print("Server response: ");
+    Serial.println(data.as<const char*>());
+  } else {
+    Serial.print("Server response: ");
+    String output;
+    serializeJson(data, output);
+    Serial.println(output);
   }
-
-  if (!attributeFound)
-  {
-    Serial.println("LED value not found in shared attributes, using current state");
-  }
+  
+  rpcInProgress = false;
+  Serial.println("=========================================");
 }
 
-void requestTimedOut()
-{
-  Serial.println("Timeout: No response from ThingsBoard within 5 seconds.");
+// RPC timeout function
+void rpcTimeoutCallback() {
+  Serial.println("RPC timeout - no response from server");
+  rpcInProgress = false;
 }
 
-const Shared_Attribute_Callback<MAX_ATTRIBUTES> attributes_callback(&processSharedAttributes, SHARED_ATTRIBUTES_LIST.cbegin(), SHARED_ATTRIBUTES_LIST.cend());
-const Attribute_Request_Callback<MAX_ATTRIBUTES> attribute_shared_request_callback(&processSharedAttributes, REQUEST_TIMEOUT_MICROSECONDS, &requestTimedOut, SHARED_ATTRIBUTES_LIST);
+// Function to make RPC call to server
+void makeRpcCall() {
+  if (rpcInProgress) {
+    Serial.println("RPC call already in progress, skipping...");
+    return;
+  }
+  
+  Serial.println("Making client-side RPC call: getCurrentTime");
+  
+  // Create RPC callback with 10 seconds timeout
+  RPC_Request_Callback callback("getCurrentTime", rpcResponseCallback, nullptr, 10000U * 1000U, rpcTimeoutCallback);
+  
+  // Make the RPC call
+  if (client_rpc.RPC_Request(callback)) {
+    Serial.println("RPC call sent successfully");
+    rpcInProgress = true;
+  } else {
+    Serial.println("Failed to send RPC call");
+  }
+}
 
 void InitWiFi() {
   Serial.println("Connecting to WiFi...");
@@ -112,20 +127,12 @@ void loop()
     }
     
     Serial.println("Connected to ThingsBoard successfully!");
-    
-    // Subscribe to shared attribute updates
-    if (!shared_update.Shared_Attributes_Subscribe(attributes_callback)) {
-      Serial.println("Failed to subscribe for shared attribute updates");
-      return;
-    }
-    
-    // Request current shared attributes
-    if (!attr_request.Shared_Attributes_Request(attribute_shared_request_callback)) {
-      Serial.println("Failed to request for shared attributes");
-      return;
-    }
-    
-    Serial.println("Subscribed to shared attributes");
+  }
+  
+  // Make RPC call at regular intervals
+  if (millis() - lastRpcCall >= RPC_INTERVAL) {
+    lastRpcCall = millis();
+    makeRpcCall();
   }
   
   // Process ThingsBoard messages
