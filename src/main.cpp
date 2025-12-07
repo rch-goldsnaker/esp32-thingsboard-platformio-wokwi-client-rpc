@@ -4,14 +4,16 @@
 #include <Client_Side_RPC.h>
 #include <RPC_Request_Callback.h>
 
+// WiFi Configuration
 constexpr char WIFI_SSID[] = "Wokwi-GUEST";
 constexpr char WIFI_PASSWORD[] = "";
+
+// ThingsBoard Configuration
 constexpr char TOKEN[] = "qrXSMGvV47EJHBq4BkDm";
 constexpr char THINGSBOARD_SERVER[] = "thingsboard.cloud";
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
-#define LED_PIN 2
-
+// ThingsBoard Objects
 WiFiClient wifiClient;
 Arduino_MQTT_Client mqttClient(wifiClient);
 Client_Side_RPC<5U> client_rpc;
@@ -22,12 +24,12 @@ const std::array<IAPI_Implementation *, 1U> apis = {
 
 ThingsBoard tb(mqttClient, 1024U, Default_Max_Stack_Size, apis);
 
-// Variables for Client-side RPC
+// Client-side RPC Variables
 unsigned long lastRpcCall = 0;
 const unsigned long RPC_INTERVAL = 10000; // Call RPC every 10 seconds
 bool rpcInProgress = false;
 
-// Callback function to handle RPC response
+// RPC Callback Functions
 void rpcResponseCallback(const JsonDocument &data) {
   Serial.println("=== CLIENT-SIDE RPC RESPONSE RECEIVED ===");
   
@@ -49,13 +51,11 @@ void rpcResponseCallback(const JsonDocument &data) {
   Serial.println("=========================================");
 }
 
-// RPC timeout function
 void rpcTimeoutCallback() {
   Serial.println("RPC timeout - no response from server");
   rpcInProgress = false;
 }
 
-// Function to make RPC call to server
 void makeRpcCall() {
   if (rpcInProgress) {
     Serial.println("RPC call already in progress, skipping...");
@@ -76,6 +76,7 @@ void makeRpcCall() {
   }
 }
 
+// WiFi Functions
 void InitWiFi() {
   Serial.println("Connecting to WiFi...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -97,31 +98,24 @@ const bool reconnect() {
   return true;
 }
 
-
-
-void setup()
-{
+// Arduino Setup and Main Loop
+void setup() {
   Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
   InitWiFi();
 }
 
-void loop()
-{
+void loop() {
   // Check WiFi connection
-  if (!reconnect())
-  {
+  if (!reconnect()) {
     return;
   }
 
   // Connect to ThingsBoard if not connected
-  if (!tb.connected())
-  {
+  if (!tb.connected()) {
     Serial.print("Connecting to ThingsBoard: ");
     Serial.println(THINGSBOARD_SERVER);
     
-    if (!tb.connect(THINGSBOARD_SERVER, TOKEN, THINGSBOARD_PORT))
-    {
+    if (!tb.connect(THINGSBOARD_SERVER, TOKEN, THINGSBOARD_PORT)) {
       Serial.println("Failed to connect to ThingsBoard!");
       return;
     }
@@ -137,6 +131,6 @@ void loop()
   
   // Process ThingsBoard messages
   tb.loop();
-
+  
   delay(200);
 }
