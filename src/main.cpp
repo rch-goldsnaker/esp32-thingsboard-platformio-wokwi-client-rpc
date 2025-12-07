@@ -9,7 +9,7 @@ constexpr char WIFI_SSID[] = "Wokwi-GUEST";
 constexpr char WIFI_PASSWORD[] = "";
 
 // ThingsBoard Configuration
-constexpr char TOKEN[] = "qrXSMGvV47EJHBq4BkDm";
+constexpr char TOKEN[] = "HgproOsPgk5uaV5sN8fE";
 constexpr char THINGSBOARD_SERVER[] = "thingsboard.cloud";
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
@@ -33,19 +33,10 @@ bool rpcInProgress = false;
 void rpcResponseCallback(const JsonDocument &data) {
   Serial.println("=== CLIENT-SIDE RPC RESPONSE RECEIVED ===");
   
-  if (data.is<long long>()) {
-    long long serverTime = data.as<long long>();
-    Serial.print("Server current time: ");
-    Serial.println(serverTime);
-  } else if (data.is<const char*>()) {
-    Serial.print("Server response: ");
-    Serial.println(data.as<const char*>());
-  } else {
-    Serial.print("Server response: ");
-    String output;
-    serializeJson(data, output);
-    Serial.println(output);
-  }
+  Serial.print("Server response: ");
+  String output;
+  serializeJson(data, output);
+  Serial.println(output);
   
   rpcInProgress = false;
   Serial.println("=========================================");
